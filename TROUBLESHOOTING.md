@@ -64,3 +64,5 @@ A: 检查 `NODE_DISPLAY_NAME_MAPPINGS`，这是显示名称，不影响JS匹配
 **Q: 使用__init__.py自动加载时节点不工作**
 A: 尝试手动整合所有节点到一个 `nodes.py` 文件中
 
+
+

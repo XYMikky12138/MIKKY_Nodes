@@ -25,8 +25,40 @@ class MIKKYConditionalImageInput:
     @classmethod
     def INPUT_TYPES(cls):
         input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        files = []
+        
+        # 扫描根目录的文件
+        if os.path.isdir(input_dir):
+            root_files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+            files.extend(root_files)
+        
+        # 递归扫描所有子目录的文件（包括 pasted/, clipspace/ 等）
+        if os.path.isdir(input_dir):
+            try:
+                for item in os.listdir(input_dir):
+                    subdir_path = os.path.join(input_dir, item)
+                    if os.path.isdir(subdir_path):
+                        try:
+                            # 扫描子目录中的所有文件
+                            subdir_files = [f for f in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, f))]
+                            # 添加子目录前缀（使用正斜杠以确保跨平台兼容）
+                            subdir_files_with_prefix = [f"{item}/{f}" for f in subdir_files]
+                            files.extend(subdir_files_with_prefix)
+                            
+                            # 针对 clipspace/ 前缀的文件，同时添加带 [input] 后缀的版本（ComfyUI会在显示时添加）
+                            if item == "clipspace":
+                                subdir_files_with_input_suffix = [f"{item}/{f} [input]" for f in subdir_files]
+                                files.extend(subdir_files_with_input_suffix)
+                        except (PermissionError, OSError) as e:
+                            # 跳过无法访问的子目录
+                            print(f"[MIKKYConditionalImageInput] Warning: Cannot access subdirectory {item}: {e}")
+                            continue
+            except (PermissionError, OSError) as e:
+                # 如果无法列出目录，至少使用根目录的文件
+                print(f"[MIKKYConditionalImageInput] Warning: Cannot list input directory: {e}")
+        
         files = sorted(files)
+        
         # 确保默认文件存在
         if DEFAULT_WHITE_FILENAME not in files:
             img = Image.new('RGB', (512, 512), (255, 255, 255))
@@ -57,6 +89,11 @@ class MIKKYConditionalImageInput:
         # 正常逻辑：如果是默认白图，输出 None；否则加载图片
         if image == DEFAULT_WHITE_FILENAME:
             return (None, None)
+        
+        # 针对 clipspace/ 前缀的图像，移除 ComfyUI 添加的 [input] 后缀
+        if image.startswith("clipspace/") and image.endswith(" [input]"):
+            image = image[:-8]  # 移除 " [input]" 后缀（8个字符）
+        
         loader = LoadImage()
         return loader.load_image(image)
 

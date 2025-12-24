@@ -355,12 +355,22 @@ class MIKKYAEMaskEditorWidget {
                 e.stopPropagation();
 
                 const maxFrame = this.images.length - 1;
-                const newFrame = Math.max(0, Math.min(maxFrame, this.currentFrame + delta));
+                const fromFrame = this.currentFrame;
+                const newFrame = Math.max(0, Math.min(maxFrame, fromFrame + delta));
                 
                 if (newFrame !== this.currentFrame) {
                     if (this.isDrawing) {
                         this.maskStorage[this.currentFrame] = this.canvasDraw.toDataURL("image/png");
                         this.saveAllMasks();
+                    }
+
+                    // Shift + 切帧：复制当前帧遮罩到目标帧（用于快速连续标注）
+                    if (e.shiftKey) {
+                        const srcMask = this.maskStorage[fromFrame];
+                        if (srcMask) {
+                            this.maskStorage[newFrame] = srcMask;
+                            this.saveAllMasks();
+                        }
                     }
 
                     this.currentFrame = newFrame;

@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-
 # ==========================================
 # 节点 1: 智能裁切 (BananaSmartCrop)
 # ==========================================
@@ -107,6 +106,25 @@ class MIKKYBananaSmartCrop:
 
         real_w = x2 - x1
         real_h = y2 - y1
+        
+        # 修正：在 clamp 后重新调整以保持目标比例
+        # 如果实际区域的比例与目标比例不一致，需要进一步收缩以保持比例
+        actual_ratio = real_w / max(1, real_h)
+        if abs(actual_ratio - target_ratio_val) > 0.01:  # 允许1%的误差
+            if actual_ratio > target_ratio_val:
+                # 实际宽度相对太大，需要缩小宽度
+                new_real_w = int(real_h * target_ratio_val)
+                diff = real_w - new_real_w
+                x1 += diff // 2
+                x2 -= diff - (diff // 2)
+                real_w = x2 - x1
+            else:
+                # 实际高度相对太大，需要缩小高度
+                new_real_h = int(real_w / target_ratio_val)
+                diff = real_h - new_real_h
+                y1 += diff // 2
+                y2 -= diff - (diff // 2)
+                real_h = y2 - y1
 
         # 6. 生成输出
         # 全图大小的 Box Mask (仅供预览用)
@@ -175,6 +193,17 @@ class MIKKYBananaUncropPaste:
         # ============================================================
         # 后续逻辑：羽化与合成
         # ============================================================
+        
+        # 通道对齐：确保 final_paste_image 与 original_image 通道数一致
+        if final_paste_image.shape[3] != original_image.shape[3]:
+            if final_paste_image.shape[3] == 4 and original_image.shape[3] == 3:
+                # 去除 alpha 通道，只保留 RGB
+                final_paste_image = final_paste_image[:, :, :, :3]
+            elif final_paste_image.shape[3] == 3 and original_image.shape[3] == 4:
+                # 添加 alpha 通道（全不透明）
+                alpha_channel = torch.ones((final_paste_image.shape[0], final_paste_image.shape[1], 
+                                           final_paste_image.shape[2], 1), dtype=final_paste_image.dtype)
+                final_paste_image = torch.cat([final_paste_image, alpha_channel], dim=3)
 
         # 准备画布
         output_image = original_image.clone()
